@@ -188,9 +188,12 @@ async def play(ctx, url: str):
     voice.play(discord.FFmpegPCMAudio("song.mp3"), after=lambda e: check_queue())
     voice.source = discord.PCMVolumeTransformer(voice.source)
     voice.source.value = 0.07
+    try:
+        nname = name.rsplit("-", 2)
+        await ctx.send(f"Playing: {nname}")
+    except:
+        await ctx.send(f"Playing Song")
 
-    nname = name.rsplit("-", 2)
-    await ctx.send(f"Playing: {nname}")
     print("Playing")
 
 
@@ -218,8 +221,6 @@ async def resume(ctx):
 
     voice = get(bot.voice_clients,  guild=ctx.guild)
 
-    queues.clear()
-
     if voice and voice.is_paused():
         print("Resumed music")
         voice.resume()
@@ -235,6 +236,12 @@ async def resume(ctx):
 async def stop(ctx):
 
     voice = get(bot.voice_clients, guild=ctx.guild)
+
+    # Remove all files in queue
+    queues.clear()
+    queue_infile = os.path.isdir("./Queue")
+    if queue_infile is True:
+        shutil.rmtree("./Queue")
 
     if voice and voice.is_paused():
         print("Stopped music")
@@ -267,7 +274,7 @@ async def queue(ctx, url):
 
     # Get the number of files in Queue
     q_num = len(os.listdir(DIR))
-    # Adds song to queue
+    # Song number of next song
     q_num += 1
     add_queue = True
     while add_queue:
@@ -309,6 +316,21 @@ async def queue(ctx, url):
     await ctx.send("Adding song " + str(q_num) + " to the queue")
 
     print("Song added to queue\n")
+
+
+# Next command
+# Aliases are short-hand for people who don't want to type "Next"
+@bot.command(pass_context=True, aliases=['n', 'nex'])
+async def next(ctx):
+    voice = get(bot.voice_clients, guild=ctx.guild)
+
+    if voice and voice.is_playing():
+        print("Playing next song")
+        voice.stop()
+        await ctx.send("Next Song")
+    else:
+        print("No music playing, failed to play next song")
+        await ctx.send("No music playing, failed to play next song")
 
 
 bot.run(TOKEN)
