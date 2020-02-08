@@ -3,6 +3,7 @@ from discord.ext import commands
 from discord.utils import get
 import youtube_dl
 import os
+from os import system
 import shutil
 
 
@@ -158,11 +159,19 @@ async def play(ctx, url: str):
         }],
     }
 
-    # Pass options to youtube downloader
-    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        print("Downloading audio now\n")
-        # Download song
-        ydl.download([url])
+    try:
+        # Pass options to youtube downloader
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            print("Downloading audio now\n")
+            # Download song
+            ydl.download([url])
+    except:
+        print("FALLBACK: youtube_dl does not support this URL. Check if URL is from Spotify")
+        # Get current working directory
+        c_path = os.path.dirname(os.path.realpath(__file__))
+        # Send this to terminal
+        # Downloads song to current directory
+        system("spotdl -f " + '"' + c_path + '"' + " -s " + url)
 
     # Current working directory
     for file in os.listdir("./"):
@@ -284,15 +293,22 @@ async def queue(ctx, url):
         }],
     }
 
-    # Pass options to youtube downloader
-    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        print("Downloading audio now\n")
-        # Download song
-        ydl.download([url])
+    try:
+        # Pass options to youtube downloader
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            print("Downloading audio now\n")
+            # Download song
+            ydl.download([url])
+    except:
+        print("FALLBACK: youtube_dl does not support this URL. Check if URL is from Spotify")
+        # Get path to Queue folder
+        q_path = os.path.abspath(os.path.realpath("Queue"))
+        # Downloads song to Queue directory with specified name
+        system(f"spotdl -ff song{q_num} -f " + '"' + q_path + '"' + " -s " + url)
+
     await ctx.send("Adding song " + str(q_num) + " to the queue")
 
     print("Song added to queue\n")
-
 
 
 bot.run(TOKEN)
