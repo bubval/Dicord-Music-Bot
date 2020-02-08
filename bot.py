@@ -3,9 +3,11 @@ from discord.ext import commands
 from discord.utils import get
 import youtube_dl
 import os
+import shutil
+
 
 # Generated on Discord Dev
-TOKEN = 'Njc0OTgzNDA3MzYwNjcxNzQ1.Xj1ptA.f2OkTecoHyLh_52zvkjh1f18QNo'
+TOKEN = open("token.txt").readline()
 # What comes before the command
 BOT_PREFIX = '/'
 
@@ -67,6 +69,53 @@ async def leave(ctx):
 # Aliases are short-hand for people who don't want to type "Play"
 @bot.command(pass_context=True, aliases=['p', 'pla'])
 async def play(ctx, url: str):
+
+    def check_queue():
+        # Check if Queue folder exists
+        Queue_infile = os.path.isdir("./Queue")
+        if Queue_infile is True:
+            DIR = os.path.abspath(os.path.realpath("Queue"))
+            length = len(os.listdir(DIR))
+            # Queue length after current song is over
+            still_q = length - 1
+            try:
+                first_file = os.listdir(DIR)[0]
+            except:
+                print("No more queued song(s)\n")
+                queues.clear()
+                return
+            main_location = os.path.dirname(os.path.realpath(__file__))
+            song_path = os.path.abspath(os.path.realpath("Queue") + "\\" + first_file)
+            if length != 0:
+                print("Song done, playing next\n")
+                print(f"Songs still in queue: {still_q}")
+
+                # Check if song we just played is still there
+                song_there = os.path.isfile("song.mp3")
+                if song_there is True:
+                    # Delete the file of the song that just ended playing
+                    os.remove("song.mp3")
+
+                # Move the next song in queue to the main directory
+                shutil.move(song_path, main_location)
+
+                # Check if there is an mp3 file, then rename it to song.mp3
+                for file in os.listdir("./"):
+                    if file.endswith(".mp3"):
+                        os.rename(file, "song.mp3")
+
+                # Play audio
+                # After checks if the song is done playing
+                voice.play(discord.FFmpegPCMAudio("song.mp3"), after=lambda e:check_queue())
+                voice.source = discord.PCMVolumeTransformer(voice.source)
+                voice.source.value = 0.07
+            else:
+                queues.clear()
+                return
+        else:
+            queues.clear()
+            print("No songs were queued before the ending of the last song\n")
+
     # check if file exists in directory
     song_there = os.path.isfile("song.mp3")
 
@@ -75,11 +124,25 @@ async def play(ctx, url: str):
         # Remove song if file exists
         if song_there:
             os.remove("song.mp3")
+            queues.clear()
             print("Removed old song file")
     except PermissionError:
         print("Trying to delete song file, but is being played")
         await ctx.send("ERROR: Music currently playing")
         return
+
+    # Check for old Queue folder
+    Queue_infile = os.path.isdir("./Queue")
+    try:
+        Queue_folder = "./Queue"
+        # Remove old Queue folder
+        if Queue_infile is True:
+            print("Remove old Queue Folder")
+            # Removes folder and all sub-files/sub-folder
+            # OS cannot remove folder w/ files
+            shutil.rmtree(Queue_folder)
+    except:
+        print("No old Queue folder found")
 
     await ctx.send("Getting everything ready")
     # Current voice channel
@@ -112,7 +175,8 @@ async def play(ctx, url: str):
 
     # Play audio
     # After checks if the song is done playing
-    voice.play(discord.FFmpegPCMAudio("song.mp3"), after=lambda e: print(f"{name} has finished playing"))
+    # Queues next song
+    voice.play(discord.FFmpegPCMAudio("song.mp3"), after=lambda e: check_queue())
     voice.source = discord.PCMVolumeTransformer(voice.source)
     voice.source.value = 0.07
 
@@ -145,6 +209,8 @@ async def resume(ctx):
 
     voice = get(bot.voice_clients,  guild=ctx.guild)
 
+    queues.clear()
+
     if voice and voice.is_paused():
         print("Resumed music")
         voice.resume()
@@ -172,6 +238,61 @@ async def stop(ctx):
     else:
         print("No music playing, failed to stop")
         await ctx.send("No music playing, failed to stop")
+
+
+queues = {}
+
+
+# Queue command
+# Aliases are short-hand for people who don't want to type "Queue"
+@bot.command(pass_context=True, aliases=['q', 'que'])
+async def queue(ctx, url):
+    # Check if Queue is in working directory
+    Queue_infile = os.path.isdir("./Queue")
+
+    if Queue_infile is False:
+        os.mkdir("Queue")
+
+    # Get absolute path of the queue
+    DIR = os.path.abspath(os.path.realpath("Queue"))
+
+    # Get the number of files in Queue
+    q_num = len(os.listdir(DIR))
+    # Adds song to queue
+    q_num += 1
+    add_queue = True
+    while add_queue:
+        # Check if number is in dictionary
+        if q_num in queues:
+            q_num += 1
+        else:
+            # Adds to queue and get out of loop
+            add_queue = False
+            queues[q_num] = q_num
+
+    # Make sure the song has that number attached to it.
+    queue_path = os.path.abspath(os.path.realpath("Queue") + f"\song{q_num}.%(ext)s")
+
+    # Set download options to high quality
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'outtmpl': queue_path,
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }],
+    }
+
+    # Pass options to youtube downloader
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        print("Downloading audio now\n")
+        # Download song
+        ydl.download([url])
+    await ctx.send("Adding song " + str(q_num) + " to the queue")
+
+    print("Song added to queue\n")
+
 
 
 bot.run(TOKEN)
